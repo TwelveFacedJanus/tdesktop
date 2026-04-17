@@ -89,34 +89,37 @@ constexpr auto kLinkProtocols = {
 		Fn<bool(not_null<DocumentData*>)> allowPremiumEmoji) {
 	return [=](QStringView mimeTag) {
 		const auto id = session->userId().bare;
+		const auto isPremium = session->premium();
+		const auto premiumPossible = session->premiumPossible();
 		auto all = TextUtilities::SplitTags(mimeTag);
 		auto premiumSkipped = (DocumentData*)nullptr;
+		
 		for (auto i = all.begin(); i != all.end();) {
 			const auto tag = *i;
-			if (TextUtilities::IsMentionLink(tag)
-				&& TextUtilities::MentionNameDataToFields(tag).selfId != id) {
+			if (TextUtilities::IsMentionLink(tag)) {
+				if (TextUtilities::MentionNameDataToFields(tag).selfId != id) {
 				i = all.erase(i);
 				continue;
+				}
 			} else if (Ui::InputField::IsCustomEmojiLink(tag)) {
 				const auto data = Ui::InputField::CustomEmojiEntityData(tag);
 				const auto emoji = Data::ParseCustomEmojiData(data);
 				if (!emoji) {
 					i = all.erase(i);
 					continue;
-				} else if (!session->premium()) {
+				} else if (!isPremium) {
 					const auto document = session->data().document(emoji);
-					if (document->isPremiumEmoji()) {
-						if (!allowPremiumEmoji
+					if (document->isPremiumEmoji()
+						&& (!allowPremiumEmoji
 							|| premiumSkipped
-							|| !session->premiumPossible()
-							|| !allowPremiumEmoji(document)) {
+							|| !premiumPossible
+							|| !allowPremiumEmoji(document))) {
 							premiumSkipped = document;
 							i = all.erase(i);
 							continue;
 						}
 					}
 				}
-			}
 			++i;
 		}
 		return TextUtilities::JoinTag(all);
